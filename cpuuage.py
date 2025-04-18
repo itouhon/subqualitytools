@@ -5,8 +5,8 @@ STR_COREDID = 'cid'
 STR_TSKID = 'tid'
 STR_TSKUSAGE = 'usage'
 INT_INVTSKID = 64
-core_ptn = re.compile(r'\[DBG\].+\[CORE([0-9])\]')
-tsk_ptn = re.compile(r'\s+([0-9]+):\s*([0-9]+\.[0-9]+)')
+core_ptn = re.compile(r'.+\[DBG\]Time.+\[CORE([0-9])\]')
+tsk_ptn = re.compile(r'.+\]\s+([0-9]+):\s*([0-9]+\.[0-9]+)')
 cpu_ptn = re.compile(r'.+CORE([0-9]).+\s([0-9]+\.[0-9]+)%')
 
 def analyze_log(file_path):
