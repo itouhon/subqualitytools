@@ -5,8 +5,8 @@ STR_COREDID = 'cid'
 STR_TSKID = 'tid'
 STR_TSKUSAGE = 'usage'
 INT_INVTSKID = 64
-core_ptn = re.compile(r'.+\[DBG\]Time.+\[CORE([0-9])\]')
-tsk_ptn = re.compile(r'.+\]\s+([0-9]+):\s*([0-9]+\.[0-9]+)')
+core_ptn = re.compile(r'.+\[CORE([0-9])\]')
+tsk_ptn = re.compile(r'.*\s+([0-9]+):\s*([0-9]+\.[0-9]+)')
 cpu_ptn = re.compile(r'.+CORE([0-9]).+\s([0-9]+\.[0-9]+)%')
 
 def analyze_log(file_path):
@@ -68,7 +68,7 @@ def calculate_average_usage(cpu_usages):
     return average_usage
 
 
-def save_tasks_csv(tasks, output_file):
+def save_tasks_csv(usage, output_file):
     """
     将任务数据写入 CSV 文件
     :param tasks: 字典形式的任务数据 {task_id: avg_usage}
@@ -78,14 +78,14 @@ def save_tasks_csv(tasks, output_file):
         with open(output_file, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             # 写入标题行
-            writer.writerow(["TaskID", "AverageUsage(%)"])
+            writer.writerow(["Core", "TaskID", "AvgUsage(%)"])
 
-            # 写入任务数据
-            for task_id, avg_usage in tasks.items():
-                if task_id != INT_INVTSKID:
-                    writer.writerow([task_id, f"{avg_usage:.3f}"])
-                else:
-                    writer.writerow(["CPU", f"{avg_usage:.3f}"])
+            for core_id, tasks in usage.items():
+                for task_id, avg_usage in tasks.items():
+                    if task_id != INT_INVTSKID:
+                        writer.writerow([f'CORE{core_id}', f'Task[{task_id}]', f'{avg_usage:.3f}'])
+                    else:
+                        writer.writerow([f'CORE{core_id}', 'CPU', f'{avg_usage:.3f}'])
 
         print(f"file: {output_file} done")
     except Exception as e:
@@ -99,15 +99,9 @@ def main():
             break
         cpu_usages = analyze_log(file_path)
         average_usage = calculate_average_usage(cpu_usages)
-        for core_id, tasks in average_usage.items():
-            print(f"CoreID[{core_id}]:")
-            for task_id, avg_usage in tasks.items():
-                if task_id != INT_INVTSKID:
-                    print(f"  TaskID[{task_id}]: avg usage[{avg_usage:.3f}%]")
-                else:
-                    print(f"  CPU: avg usage[{avg_usage:.3f}%]")
-            output_file = f"Core{core_id}_tasks.csv"  # 动态生成文件名
-            save_tasks_csv(tasks, output_file)
+        output_file = f"CPU_tasks.csv"  # 动态生成文件名
+        save_tasks_csv(average_usage, output_file)
+
 
 if __name__ == "__main__":
     main()
