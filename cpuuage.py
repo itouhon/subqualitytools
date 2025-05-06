@@ -1,32 +1,40 @@
 import re
 import csv
 
-STR_COREDID = 'cid'
+OUTPUT_AVGFILE = 'CPU_tasks_avg.csv'
+OUTPUT_STSFILE = 'CPU_tasks_sts.csv'
+STR_TIME = 'time'
+STR_COREID = 'cid'
 STR_TSKID = 'tid'
 STR_TSKUSAGE = 'usage'
-INT_INVTSKID = 64
-core_ptn = re.compile(r'.+\[CORE([0-9])\]')
+INT_INVTSKID = 256
+core_ptn = re.compile(r'.+\s+([0-9]+)\).+\[CORE([0-9])\]')
 tsk_ptn = re.compile(r'.*\s+([0-9]+):\s*([0-9]+\.[0-9]+)')
-cpu_ptn = re.compile(r'.+CORE([0-9]).+\s([0-9]+\.[0-9]+)%')
+cpu_ptn = re.compile(r'.*\[\s*([0-9]+)\].+CORE([0-9]).+\s([0-9]+\.[0-9]+)%')
+
 
 def analyze_log(file_path):
     cpu_usages = []
     coreid = 0
+    time = 0
     try:
         with open(file_path, 'r') as file:
             for line in file:
                 corematch = core_ptn.match(line)
                 if corematch:
-                    coreid = int(corematch.group(1))
+                    time = int(corematch.group(1))
+                    coreid = int(corematch.group(2))
                     continue
                 tskmatch = tsk_ptn.match(line)
                 if tskmatch and 0 != coreid:
-                    usage = {STR_COREDID: coreid, STR_TSKID: int(tskmatch.group(1)), STR_TSKUSAGE: float(tskmatch.group(2))}
+                    usage = {STR_TIME: time, STR_COREID: coreid, STR_TSKID: int(tskmatch.group(1)),
+                             STR_TSKUSAGE: float(tskmatch.group(2))}
                     cpu_usages.append(usage)
                     continue
                 cpumatch = cpu_ptn.match(line)
                 if cpumatch:
-                    usage = {STR_COREDID: int(cpumatch.group(1)), STR_TSKID: INT_INVTSKID, STR_TSKUSAGE: float(cpumatch.group(2))}
+                    usage = {STR_TIME: int(cpumatch.group(1)), STR_COREID: int(cpumatch.group(2)),
+                             STR_TSKID: INT_INVTSKID, STR_TSKUSAGE: float(cpumatch.group(3))}
                     cpu_usages.append(usage)
                     continue
     except FileNotFoundError:
@@ -41,7 +49,7 @@ def calculate_average_usage(cpu_usages):
     usage_summary = {}
 
     for entry in cpu_usages:
-        core_id = entry[STR_COREDID]
+        core_id = entry[STR_COREID]
         task_id = entry[STR_TSKID]
         usage = entry[STR_TSKUSAGE]
 
@@ -68,7 +76,7 @@ def calculate_average_usage(cpu_usages):
     return average_usage
 
 
-def save_tasks_csv(usage, output_file):
+def save_avg_csv(usage, output_file) -> None:
     """
     将任务数据写入 CSV 文件
     :param tasks: 字典形式的任务数据 {task_id: avg_usage}
@@ -90,6 +98,28 @@ def save_tasks_csv(usage, output_file):
         print(f"file: {output_file} done")
     except Exception as e:
         print(f"Err: {e}")
+    return
+
+
+def save_all_csv(usage, output_file) -> None:
+    try:
+        with open(output_file, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            # 写入标题行
+            writer.writerow(["Time", "Core", "TaskID", "Usage(%)"])
+
+            for it in usage:
+                if it[STR_TSKID] != INT_INVTSKID:
+                    writer.writerow([f'{it[STR_TIME]}', f'CORE{it[STR_COREID]}', f'Task[{it[STR_TSKID]}]',
+                                     f'{it[STR_TSKUSAGE]:.3f}'])
+                else:
+                    writer.writerow([f'{it[STR_TIME]}', f'CORE{it[STR_COREID]}', 'CPU', f'{it[STR_TSKUSAGE]:.3f}'])
+
+        print(f"file: {output_file} done")
+    except Exception as e:
+        print(f"Err: {e}")
+    return
+
 
 def main():
     while True:
@@ -99,8 +129,8 @@ def main():
             break
         cpu_usages = analyze_log(file_path)
         average_usage = calculate_average_usage(cpu_usages)
-        output_file = f"CPU_tasks.csv"  # 动态生成文件名
-        save_tasks_csv(average_usage, output_file)
+        save_avg_csv(average_usage, OUTPUT_AVGFILE)
+        save_all_csv(cpu_usages, OUTPUT_STSFILE)
 
 
 if __name__ == "__main__":
